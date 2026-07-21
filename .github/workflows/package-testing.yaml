@@ -29,16 +29,16 @@ jobs:
       run: uv python install
 
     - name: Run tests and generate coverage
-      run: uv run pytest --cov=request_manager tests/
+      run: uv run coverage xml -o reports/coverage/coverage.xml
 
     - name: Generate coverage badge
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.python-version == '3.13-alpine'
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.python-version == '3.14-alpine'
       run: |
         rm -fr coverage.svg
-        uv run coverage-badge -o coverage.svg
+        uv run genbadge coverage -o coverage.svg
 
     - name: Commit coverage badge
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.python-version == '3.13-alpine'
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.python-version == '3.14-alpine'
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
