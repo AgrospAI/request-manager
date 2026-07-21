@@ -1,0 +1,47 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Package testing
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12-alpine", "3.13-alpine", "3.14-alpine"]
+
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+    - name: Setup and install uv
+      uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57
+      with:
+        version: "0.10.8"
+
+    - name: Setup python
+      run: uv python install
+
+    - name: Run tests and generate coverage
+      run: uv run pytest --cov=request_manager tests/
+
+    - name: Generate coverage badge
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.python-version == '3.13-alpine'
+      run: |
+        rm -fr coverage.svg
+        uv run coverage-badge -o coverage.svg
+
+    - name: Commit coverage badge
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.python-version == '3.13-alpine'
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git add coverage.svg
+        git diff --cached --quiet || git commit -m "Update coverage badge"
+        git push
