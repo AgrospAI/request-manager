@@ -27,7 +27,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "mypy>=2.3.0",
-    "pytest-cov>=7.1.0",
     "pre-commit>=4.6.0",
     "genbadge[coverage]>=1.1.3",
+    "pytest-cov>=7.1.0",
 ]
