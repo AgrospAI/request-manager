@@ -31,9 +31,9 @@ repos:
         types: [python]
         require_serial: true
 
-      - id: ty
-        name: ty
-        entry: uv run ty check
+      - id: mypy
+        name: mypy
+        entry: uv run mypy check
         language: system
         types: [python]
         exclude: ^tests/|test_.*\.py$
