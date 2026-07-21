@@ -752,6 +752,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+    { name = "request-manager", extra = ["httpx"] },
     { name = "ruff" },
 ]
 
@@ -771,6 +772,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "request-manager", extras = ["httpx"] },
     { name = "ruff", specifier = ">=0.15.21" },
 ]
 

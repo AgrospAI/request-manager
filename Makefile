@@ -1,5 +1,5 @@
 cov-xml:
-	uv run pytest --cov=request_manager tests/ --cov-report=xml
+	uv run coverage xml -o reports/coverage/coverage.xml
 
 
 cov:

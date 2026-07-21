@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
 from dataclasses import asdict, dataclass, replace
-from typing import Any, Literal, Self, cast
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel
 
@@ -14,10 +14,15 @@ class Request:
     path: str | None = None
     headers: Headers | None = None
     body: bytes | None = None
+    timeout: float = 0.0
+    retries: int = 0
+    retry_backoff: float = 0.2
 
 
 @dataclass(frozen=True, slots=True)
 class Response[BodyT]:
+    request: Request
+
     status_code: int
     body: BodyT
     headers: Headers | None = None

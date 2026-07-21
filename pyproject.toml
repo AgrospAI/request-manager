@@ -13,6 +13,8 @@ httpx = ["httpx>=0.28.1"]
 [tool.uv]
 package = true
 
+[tool.mypy]
+files = "src"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -23,6 +25,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "request-manager[httpx]",
     "ruff>=0.15.21",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

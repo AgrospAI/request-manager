@@ -13,8 +13,8 @@ class HttpxClient(BaseClient):
     """Base client to use in queries"""
 
     async def __aenter__(self):
-        async with self.client as client:
-            yield client
+        await self.client.__aenter__()
+        return self
 
     @override
     async def fetch(
@@ -30,6 +30,7 @@ class HttpxClient(BaseClient):
         response.raise_for_status()
 
         return Response(
+            request=request,
             status_code=response.status_code,
             headers={**response.headers},
             body=response.read(),

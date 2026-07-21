@@ -17,8 +17,9 @@ class MockClient(BaseClient):
     status_code: int = 200
 
     @override
-    async def fetch(self, _: Request) -> Response[bytes]:
+    async def fetch(self, request: Request) -> Response[bytes]:
         return Response(
+            request=request,
             status_code=self.status_code,
             body=self.body.encode(),
         )

@@ -40,11 +40,11 @@ async def test_callback_setup(
         )
 
     @manager.expect(request)
-    def assert_result_2(response: Response[bytes]) -> None:
+    def _(response: Response[bytes]) -> None:
         assert response.status_code == status_code
 
     @manager.fetch(depends_on=request_2)
-    def request_3(response: Response) -> Request:
+    def _(_) -> Request:
         return Request(
             method="GET",
             path="/transcriptions/2",
