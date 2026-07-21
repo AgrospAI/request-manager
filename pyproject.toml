@@ -4,4 +4,31 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "dotenv>=0.9.9",
+    "pydantic>=2.13.4",
+]
+
+
+[project.optional-dependencies]
+httpx = ["httpx>=0.28.1"]
+
+[tool.uv]
+package = true
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.21",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "mypy>=2.3.0",
+    "pytest-cov>=7.1.0",
+]
