@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import AbstractAsyncContextManager
+
 import pytest
 
 from request_manager.manager import RequestManager
@@ -7,17 +9,20 @@ from request_manager.types import BaseClient, Request, Response
 from tests.mocks.client import MockData
 
 
-@pytest.mark.parametrize("status_code", [200, 400, 500])
 @pytest.mark.parametrize(
-    "body", ['{"data": "mock_data"}', '{"data": "1234"}', '{"data": "ok"}']
+    "status_code",
+    [200, 400, 500],
+)
+@pytest.mark.parametrize(
+    "body",
+    ['{"data": "mock_data"}', '{"data": "1234"}', '{"data": "ok"}'],
 )
 async def test_callback_setup(
     manager: RequestManager,
-    client: BaseClient,
+    client: AbstractAsyncContextManager[BaseClient],
     status_code: int,
     body: str,
 ) -> None:
-
     manager.client(client)
 
     @manager.fetch()

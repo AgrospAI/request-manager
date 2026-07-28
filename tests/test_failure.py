@@ -1,3 +1,5 @@
+from contextlib import AbstractAsyncContextManager
+
 import pytest
 
 from request_manager.exceptions import RequestManagerException
@@ -14,7 +16,7 @@ async def test_no_setup(manager: RequestManager) -> None:
 @pytest.mark.parametrize("body", ['{"data": "mock_data"}'])
 async def test_out_of_order_dependency_resolves(
     manager: RequestManager,
-    client: BaseClient,
+    client: AbstractAsyncContextManager[BaseClient],
     body: str,
 ) -> None:
     manager.client(client)
@@ -44,7 +46,7 @@ async def test_out_of_order_dependency_resolves(
 
 async def test_unresolved_dependency_raises(
     manager: RequestManager,
-    client: BaseClient,
+    client: AbstractAsyncContextManager[BaseClient],
 ) -> None:
     manager.client(client)
 

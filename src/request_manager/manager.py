@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, cast, overload
+from typing import Callable, cast, overload
 
 from pydantic import BaseModel
 
 from request_manager.exceptions import RequestManagerException
 from request_manager.logger import logger, setup_logging
 from request_manager.types import ClientContext, Request, Response
-
-type ClientFn = Callable[[], ClientContext]
 
 type IndependentFetchFn = Callable[[], Request]
 type DependentFetchFn = Callable[[Response], Request]
@@ -50,7 +48,7 @@ type ExpectCallback = RawExpectCallback | ValidatedExpectCallback[BaseModel]
 
 @dataclass(slots=True)
 class Callbacks:
-    client: ClientFn | None = None
+    client: ClientContext | None = None
     fetching: list[FetchCallback] = field(default_factory=list)
     expecting: dict[FetchCallback, list[ExpectCallback]] = field(
         default_factory=lambda: defaultdict(list)
@@ -61,14 +59,16 @@ class Callbacks:
 class RequestManager:
     callbacks: Callbacks = field(default_factory=Callbacks)
 
+    error: type[RequestManagerException] = field(default=RequestManagerException)
+
     def __post_init__(self) -> None:
         setup_logging()
 
-    # --- Function decorators ---
+    def client(self, client: ClientContext):
+        self.callbacks.client = client
+        return client
 
-    def client(self, fn: ClientFn):
-        self.callbacks.client = fn
-        return fn
+    # --- Function decorators ---
 
     @overload
     def fetch(
@@ -128,7 +128,7 @@ class RequestManager:
         if self.callbacks.client is None:
             raise RequestManagerException("There is no client configured")
 
-        async with self.callbacks.client() as client:
+        async with self.callbacks.client as client:
             logger.info("Fetching %d sources", len(self.callbacks.fetching))
 
             responses: dict[FetchCallback, Response] = {}
