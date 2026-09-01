@@ -1,134 +1,47 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable, cast, overload
 
-from pydantic import BaseModel
-
+from request_manager.callbacks import (
+    Callbacks,
+    DependentCallback,
+    FetchCallback,
+    IndependentCallback,
+    RawExpectCallback,
+    ValidatedExpectCallback,
+)
 from request_manager.exceptions import RequestManagerException
 from request_manager.logger import logger, setup_logging
-from request_manager.types import ClientContext, Request, Response
-
-type IndependentFetchFn = Callable[[], Request]
-type DependentFetchFn = Callable[[Response], Request]
-
-type RawExpectFn = Callable[[Response[bytes]], None]
-type ValidatedExpectFn[T: BaseModel] = Callable[[Response[T]], None]
-
-
-@dataclass(frozen=True)
-class RawExpectCallback:
-    fn: RawExpectFn
-
-
-@dataclass(frozen=True)
-class ValidatedExpectCallback[T: BaseModel]:
-    fn: ValidatedExpectFn[T]
-    type_: type[T]
-
-
-@dataclass(frozen=True)
-class IndependentCallback:
-    fn: IndependentFetchFn
-
-
-@dataclass(frozen=True)
-class DependentCallback:
-    fn: DependentFetchFn
-    dependency: FetchCallback
-
-
-type FetchFn = IndependentFetchFn | DependentFetchFn
-type ExpectFn[T: BaseModel | bytes = bytes] = Callable[[Response[T]], None]
-
-type FetchCallback = IndependentCallback | DependentCallback
-type ExpectCallback = RawExpectCallback | ValidatedExpectCallback[BaseModel]
+from request_manager.types import ClientContext, Response
 
 
 @dataclass(slots=True)
-class Callbacks:
+class Runtime:
     client: ClientContext | None = None
-    fetching: list[FetchCallback] = field(default_factory=list)
-    expecting: dict[FetchCallback, list[ExpectCallback]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
 
 
 @dataclass(frozen=True, slots=True)
 class RequestManager:
+    runtime: Runtime = field(default_factory=Runtime)
     callbacks: Callbacks = field(default_factory=Callbacks)
 
     error: type[RequestManagerException] = field(default=RequestManagerException)
+
+    fetch = property(lambda self: self.callbacks.fetch)
+    expect = property(lambda self: self.callbacks.expect)
 
     def __post_init__(self) -> None:
         setup_logging()
 
     def client(self, client: ClientContext):
-        self.callbacks.client = client
+        self.runtime.client = client
         return client
 
-    # --- Function decorators ---
-
-    @overload
-    def fetch(
-        self,
-        depends_on: None = None,
-    ) -> Callable[[IndependentFetchFn], IndependentCallback]: ...
-
-    @overload
-    def fetch(
-        self,
-        depends_on: FetchCallback,
-    ) -> Callable[[DependentFetchFn], DependentCallback]: ...
-
-    def fetch(self, depends_on: FetchCallback | None = None):
-        def __inner(fn: FetchFn) -> FetchCallback:
-            callback = (
-                IndependentCallback(cast(IndependentFetchFn, fn))
-                if depends_on is None
-                else DependentCallback(cast(DependentFetchFn, fn), depends_on)
-            )
-
-            self.callbacks.fetching.append(callback)
-
-            return callback
-
-        return __inner
-
-    @overload
-    def expect(
-        self,
-        fetch: FetchCallback,
-        type_: None = None,
-    ) -> Callable[[RawExpectFn], RawExpectFn]: ...
-
-    @overload
-    def expect[T: BaseModel](
-        self,
-        fetch: FetchCallback,
-        type_: type[T],
-    ) -> Callable[[ValidatedExpectFn[T]], ValidatedExpectFn[T]]: ...
-
-    def expect(self, fetch: FetchCallback, type_: type[BaseModel] | None = None):
-        def inner(fn):
-            callback = (
-                RawExpectCallback(fn=fn)
-                if type_ is None
-                else ValidatedExpectCallback(fn=fn, type_=type_)
-            )
-            self.callbacks.expecting[fetch].append(callback)
-            return fn
-
-        return inner
-
-    # ---
-
     async def run(self) -> None:
-        if self.callbacks.client is None:
+        if self.runtime.client is None:
             raise RequestManagerException("There is no client configured")
 
-        async with self.callbacks.client as client:
+        async with self.runtime.client as client:
             logger.info("Fetching %d sources", len(self.callbacks.fetching))
 
             responses: dict[FetchCallback, Response] = {}
