@@ -8,7 +8,6 @@ from request_manager.types import BaseClient, Request, Response
 
 
 async def test_no_setup(manager: RequestManager) -> None:
-
     with pytest.raises(RequestManagerException):
         await manager.run()
 
@@ -60,8 +59,10 @@ async def test_unresolved_dependency_raises(
     def _(_: Response) -> Request:
         return Request(method="GET", path="/transcriptions")
 
-    with pytest.raises(
-        RequestManagerException,
-        match="Circular or unresolved fetch dependency",
-    ):
+    with pytest.raises(ExceptionGroup) as exc_info:
         await manager.run()
+
+    inner_exceptions = exc_info.value.exceptions
+    assert len(inner_exceptions) == 1
+    assert isinstance(inner_exceptions[0], RequestManagerException)
+    assert "Unresolved fetch dependency" in str(inner_exceptions[0])

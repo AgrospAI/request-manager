@@ -6,16 +6,13 @@ from request_manager.manager import RequestManager
 from request_manager.types import Request, Response
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def httpx_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RM__BASE_URL", "https://example.com")
     monkeypatch.setenv("RM__API_KEY", "test-key")
 
 
-async def test_httpx_client(
-    manager: RequestManager,
-    httpx_environment: None,
-) -> None:
+async def test_httpx_client(manager: RequestManager) -> None:
     config = load_arguments(HttpxClientConfig)
     manager.client(build_httpx_client(config))
 
