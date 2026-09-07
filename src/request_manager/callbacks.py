@@ -1,20 +1,30 @@
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import overload
+from typing import Awaitable
 
 from pydantic import BaseModel
 
 from request_manager.types import Request, Response
 
-type IndependentFetchFn = Callable[[], Request]
-type DependentFetchFn = Callable[[Response], Request]
+type MaybeAwaitable[T] = T | Awaitable[T]
 
-type RawExpectFn = Callable[[Response[bytes]], None]
-type ValidatedExpectFn[T: BaseModel] = Callable[[Response[T]], None]
+type IndependentFetchFn = Callable[[], MaybeAwaitable[Request]]
+type DependentFetchFn[T: BaseModel | bytes = bytes] = Callable[
+    [Response[T]], MaybeAwaitable[Request]
+]
 
-type FetchCallback = IndependentCallback | DependentCallback
-type ExpectCallback = RawExpectCallback | ValidatedExpectCallback[BaseModel]
+type RawExpectFn = Callable[[Response[bytes]], MaybeAwaitable[None]]
+type ValidatedExpectFn[T: BaseModel | bytes = bytes] = Callable[
+    [Response[T]], MaybeAwaitable[None]
+]
+
+type FetchCallback[T: BaseModel | bytes = bytes] = (
+    IndependentCallback | DependentCallback[T]
+)
+type ExpectCallback[T: BaseModel | bytes = bytes] = (
+    RawExpectCallback | ValidatedExpectCallback[T]
+)
 
 
 @dataclass(frozen=True)
@@ -23,7 +33,7 @@ class RawExpectCallback:
 
 
 @dataclass(frozen=True)
-class ValidatedExpectCallback[T: BaseModel]:
+class ValidatedExpectCallback[T: BaseModel | bytes = bytes]:
     fn: ValidatedExpectFn[T]
     type_: type[T]
 
@@ -34,93 +44,15 @@ class IndependentCallback:
 
 
 @dataclass(frozen=True)
-class DependentCallback:
-    fn: DependentFetchFn
-    dependency: FetchCallback
+class DependentCallback[T: BaseModel | bytes = bytes]:
+    fn: DependentFetchFn[T]
+    dependency: FetchCallback[T]
+    type_: type[T]
 
 
 @dataclass(slots=True)
 class Callbacks:
-    fetching: list[FetchCallback] = field(default_factory=list)
-    expecting: dict[FetchCallback, list[ExpectCallback]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
-
-    # --- Function decorators ---
-
-    @overload
-    def fetch(
-        self,
-        depends_on: None = None,
-    ) -> Callable[[IndependentFetchFn], IndependentCallback]: ...
-
-    @overload
-    def fetch(
-        self,
-        depends_on: FetchCallback,
-    ) -> Callable[[DependentFetchFn], DependentCallback]: ...
-
-    def fetch(
-        self,
-        depends_on: FetchCallback | None = None,
-    ):
-        if depends_on is None:
-
-            def _inner_independent(fn: IndependentFetchFn, /) -> IndependentCallback:
-                callback = IndependentCallback(fn)
-                self.fetching.append(callback)
-                return callback
-
-            return _inner_independent
-
-        def _inner_dependent(fn: DependentFetchFn, /) -> DependentCallback:
-            callback = DependentCallback(fn, depends_on)
-            self.fetching.append(callback)
-            return callback
-
-        return _inner_dependent
-
-    @overload
-    def expect(
-        self,
-        fetch: FetchCallback,
-        type_: None = None,
-    ) -> Callable[[RawExpectFn], RawExpectCallback]: ...
-
-    @overload
-    def expect(
-        self,
-        fetch: FetchCallback,
-        type_: type[BaseModel],
-    ) -> Callable[
-        [ValidatedExpectFn[BaseModel]], ValidatedExpectCallback[BaseModel]
-    ]: ...
-
-    def expect(
-        self,
-        fetch: FetchCallback,
-        type_: type[BaseModel] | None = None,
-    ):
-        if type_ is None:
-
-            def _inner_unvalidated(
-                fn: RawExpectFn,
-                /,
-            ) -> RawExpectCallback:
-                callback = RawExpectCallback(fn)
-                self.expecting[fetch].append(callback)
-                return callback
-
-            return _inner_unvalidated
-
-        def _inner_validated(
-            fn: ValidatedExpectFn[BaseModel],
-            /,
-        ) -> ValidatedExpectCallback:
-            callback = ValidatedExpectCallback[BaseModel](fn, type_)
-            self.expecting[fetch].append(callback)
-            return callback
-
-        return _inner_validated
-
-    # ---
+    fetching: list[FetchCallback[BaseModel | bytes]] = field(default_factory=list)
+    expecting: dict[
+        FetchCallback[BaseModel | bytes], list[ExpectCallback[BaseModel | bytes]]
+    ] = field(default_factory=lambda: defaultdict(list))

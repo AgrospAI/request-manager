@@ -9,7 +9,7 @@ from request_manager.types import BaseClient, Request, Response
 
 async def test_no_setup(manager: RequestManager) -> None:
     with pytest.raises(RequestManagerException):
-        await manager.run()
+        await manager.arun()
 
 
 @pytest.mark.parametrize("body", ['{"data": "mock_data"}'])
@@ -18,13 +18,13 @@ async def test_out_of_order_dependency_resolves(
     client: AbstractAsyncContextManager[BaseClient],
     body: str,
 ) -> None:
-    manager.client(client)
+    manager.set_client(client)
 
     @manager.fetch()
     def request() -> Request:
         return Request(method="GET", path="/transcriptions")
 
-    @manager.fetch(depends_on=request)
+    @manager.fetch(depends_on=request, type_=bytes)
     def request_2(response: Response) -> Request:
         return Request(method="GET", path="/transcriptions/2")
 
@@ -38,7 +38,7 @@ async def test_out_of_order_dependency_resolves(
     def _(response: Response[bytes]) -> None:
         resolved.append(response)
 
-    await manager.run()
+    await manager.arun()
 
     assert len(resolved) == 1
 
@@ -47,7 +47,7 @@ async def test_unresolved_dependency_raises(
     manager: RequestManager,
     client: AbstractAsyncContextManager[BaseClient],
 ) -> None:
-    manager.client(client)
+    manager.set_client(client)
 
     # This dependency is referenced but deliberately never registered via
     # @manager.fetch(), so it can never appear in `responses`.
@@ -55,12 +55,12 @@ async def test_unresolved_dependency_raises(
         fn=lambda: Request(method="GET", path="/never-registered")
     )
 
-    @manager.fetch(depends_on=orphan_dependency)
+    @manager.fetch(depends_on=orphan_dependency, type_=bytes)
     def _(_: Response) -> Request:
         return Request(method="GET", path="/transcriptions")
 
     with pytest.raises(ExceptionGroup) as exc_info:
-        await manager.run()
+        await manager.arun()
 
     inner_exceptions = exc_info.value.exceptions
     assert len(inner_exceptions) == 1

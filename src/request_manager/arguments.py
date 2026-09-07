@@ -1,11 +1,12 @@
 import argparse
 import os
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from types import UnionType
-from typing import Callable, ClassVar, Sequence, Union, get_args, get_origin
+from typing import ClassVar, Union, get_args, get_origin
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
@@ -105,14 +106,29 @@ def add_arguments_from_model(
             )
 
 
+_parser: argparse.ArgumentParser | None = None
+_registered: set[type[BaseModel]] = set()
+
+
+def _get_parser() -> argparse.ArgumentParser:
+    global _parser
+
+    if _parser is None:
+        load_dotenv(find_dotenv(usecwd=False))
+        _parser = argparse.ArgumentParser(
+            prog="request-manager",
+            description="Test different API endpoints, capturing results and forwarding them",
+        )
+
+    return _parser
+
+
 def load_arguments[T: BaseModel](type_: type[T]) -> T:
-    load_dotenv()
+    parser = _get_parser()
 
-    parser = argparse.ArgumentParser(
-        prog="request-manager",
-        description="Test different API endpoints, capturing results and forwarding them",
-    )
+    if type_ not in _registered:
+        add_arguments_from_model(parser, type_)
+        _registered.add(type_)
 
-    add_arguments_from_model(parser, type_)
-
-    return type_.model_validate(vars(parser.parse_args()))
+    namespace, _ = parser.parse_known_args()
+    return type_.model_validate(vars(namespace))

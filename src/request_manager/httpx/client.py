@@ -1,3 +1,4 @@
+import logging
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import Annotated, override
@@ -6,13 +7,20 @@ from urllib.parse import urljoin
 import httpx
 from pydantic import BaseModel, Field
 
-from request_manager.types import BaseClient, Request, Response
+from request_manager.arguments import load_arguments
+from request_manager.types import BaseClient, ClientError, Request, Response
+
+logging.getLogger("httpx").setLevel(logging.WARN)
 
 
 @dataclass(frozen=True, slots=True)
 class HttpxClient(BaseClient):
     client: httpx.AsyncClient
     """Base client to use in queries"""
+
+    @staticmethod
+    def default() -> AbstractAsyncContextManager[BaseClient]:
+        return build_httpx_client(load_arguments(HttpxClientConfig))
 
     async def __aenter__(self):
         await self.client.__aenter__()
@@ -23,13 +31,15 @@ class HttpxClient(BaseClient):
         self,
         request: Request,
     ) -> Response[bytes]:
-        response = await self.client.send(
-            httpx.Request(
-                method=request.method,
-                url=urljoin(str(self.client.base_url), request.path),
-            ),
+        httpx_request = self.client.build_request(
+            method=request.method,
+            url=urljoin(str(request.url or self.client.base_url), request.path),
+            json=request.body,
         )
-        response.raise_for_status()
+
+        response = await self.client.send(httpx_request)
+        if response.is_error:
+            raise ClientError(f"There was an error. ERROR: {response.text}")
 
         return Response(
             request=request,
@@ -42,12 +52,17 @@ class HttpxClient(BaseClient):
 class HttpxClientConfig(BaseModel):
     base_url: Annotated[
         str,
-        Field(description="Base URL used for the requests"),
+        Field(default="", description="Base URL used for the requests"),
     ]
 
-    api_scheme: Annotated[
+    authorization_header: Annotated[
         str,
-        Field(description="API scheme to use", default="Bearer"),
+        Field(description="API authorization header to use", default="Authorization"),
+    ]
+
+    authorization_scheme: Annotated[
+        str,
+        Field(description="API authorization scheme to use", default="Bearer"),
     ]
 
     api_key: Annotated[
@@ -64,11 +79,17 @@ class HttpxClientConfig(BaseModel):
 def build_httpx_client(
     config: HttpxClientConfig,
 ) -> AbstractAsyncContextManager[BaseClient]:
-    headers = (
-        {"Authorization": f"{config.api_scheme} {config.api_key}"}
-        if config.api_key
-        else {}
-    )
+    headers = {"Content-Type": "application/json"}
+
+    if config.api_key is not None:
+        value = (
+            f"{config.authorization_scheme} {config.api_key}"
+            if config.authorization_scheme
+            else config.api_key
+        )
+
+        headers[config.authorization_header] = value
+
     return HttpxClient(
         client=httpx.AsyncClient(
             base_url=config.base_url,

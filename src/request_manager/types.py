@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel
@@ -9,18 +12,25 @@ type Headers = dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
-class Request:
-    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
-    path: str | None = None
-    headers: Headers | None = None
-    body: bytes | None = None
+class RequestOptions:
     timeout: float = 0.0
-    retries: int = 0
+    retries: int = -1
     retry_backoff: float = 0.2
+    is_success: Callable[[Response[Any]], bool] | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class Response[BodyT]:
+class Request:
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
+    url: str | None = None
+    path: str | None = None
+    headers: Headers | None = None
+    body: Any = None
+    options: RequestOptions = field(default_factory=RequestOptions)
+
+
+@dataclass(frozen=True, slots=True)
+class Response[BodyT: bytes | BaseModel]:
     request: Request
 
     status_code: int
@@ -28,6 +38,19 @@ class Response[BodyT]:
     headers: Headers | None = None
 
     to_dict = asdict
+
+    @property
+    def is_ok(self) -> bool:
+        return 100 <= self.status_code < 400
+
+
+class ClientError(BaseException):
+    def __init__(self, msg: str, *args: object) -> None:
+        super().__init__(*args)
+        self.msg = msg
+
+    def __str__(self) -> str:
+        return self.msg
 
 
 class BaseClient(ABC):

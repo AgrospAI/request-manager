@@ -23,7 +23,7 @@ async def test_callback_setup(
     status_code: int,
     body: str,
 ) -> None:
-    manager.client(client)
+    manager.set_client(client)
 
     @manager.fetch()
     def request() -> Request:
@@ -37,7 +37,7 @@ async def test_callback_setup(
         assert response.status_code == status_code
         assert response.body == MockData.model_validate_json(body)
 
-    @manager.fetch(depends_on=request)
+    @manager.fetch(depends_on=request, type_=bytes)
     def request_2(response: Response) -> Request:
         return Request(
             method="GET",
@@ -48,11 +48,11 @@ async def test_callback_setup(
     def _(response: Response[bytes]) -> None:
         assert response.status_code == status_code
 
-    @manager.fetch(depends_on=request_2)
+    @manager.fetch(depends_on=request_2, type_=bytes)
     def _(_) -> Request:
         return Request(
             method="GET",
             path="/transcriptions/2",
         )
 
-    await manager.run()
+    await manager.arun()
