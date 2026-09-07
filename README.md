@@ -7,6 +7,8 @@ Python library to help with experiment lifecycle.
 
 ## Installation
 
-TODO
+```bash
+uv add request-manager
+```
 
 ## Utilization
