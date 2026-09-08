@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release-build:
@@ -67,9 +68,6 @@ jobs:
           uv build
 
       - name: pypi-publish
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.pypi_token }}
-          skip-existing: false
           verbose: true
-          attestations: false

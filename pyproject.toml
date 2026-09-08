@@ -1,13 +1,10 @@
 [project]
 name = "request-manager"
 version = "0.1.4"
-description = "Add your description here"
+description = "Automating request creation and management"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
- "pydantic>=2.13.4",
- "python-dotenv>=1.2.2",
-]
+dependencies = ["pydantic>=2.13.4", "python-dotenv>=1.2.2"]
 
 
 [project.optional-dependencies]
