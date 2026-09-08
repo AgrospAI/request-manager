@@ -1,4 +1,4 @@
 from request_manager.manager import RequestManager
-from request_manager.types import BaseClient, Request, RequestOptions, Response
+from request_manager.types import Client, Request, RequestOptions, Response
 
-__all__ = ["BaseClient", "Request", "RequestManager", "Response", "RequestOptions"]
+__all__ = ["Client", "Request", "RequestManager", "Response", "RequestOptions"]

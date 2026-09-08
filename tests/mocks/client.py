@@ -4,7 +4,7 @@ from typing import override
 import pytest
 from pydantic import BaseModel
 
-from request_manager.types import BaseClient, Request, Response
+from request_manager.types import Client, Request, Response
 
 
 class MockData(BaseModel):
@@ -12,7 +12,7 @@ class MockData(BaseModel):
 
 
 @dataclass(slots=True)
-class MockClient(BaseClient):
+class MockClient(Client):
     body: str
     status_code: int = 200
 

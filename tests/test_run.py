@@ -5,7 +5,7 @@ from contextlib import AbstractAsyncContextManager
 import pytest
 
 from request_manager.manager import RequestManager
-from request_manager.types import BaseClient, Request, Response
+from request_manager.types import Client, Request, Response
 from tests.mocks.client import MockData
 
 
@@ -19,7 +19,7 @@ from tests.mocks.client import MockData
 )
 async def test_callback_setup(
     manager: RequestManager,
-    client: AbstractAsyncContextManager[BaseClient],
+    client: AbstractAsyncContextManager[Client],
     status_code: int,
     body: str,
 ) -> None:
@@ -33,7 +33,7 @@ async def test_callback_setup(
         )
 
     @manager.expect(request, type_=MockData)
-    def assert_result(response: Response[MockData]) -> None:
+    def assert_result(response: Response[MockData]):
         assert response.status_code == status_code
         assert response.body == MockData.model_validate_json(body)
 

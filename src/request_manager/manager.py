@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import inspect
-import sys
-import time
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import InitVar, dataclass, field
@@ -13,8 +10,12 @@ from typing import cast, overload
 from pydantic import BaseModel
 
 from request_manager.arguments import load_arguments
-from request_manager.callbacks import (
+from request_manager.exceptions import RequestManagerException
+from request_manager.logger import setup_logging
+from request_manager.runners import DependantRunner
+from request_manager.types import (
     Callbacks,
+    ClientContext,
     DependentCallback,
     DependentFetchFn,
     ExpectCallback,
@@ -23,12 +24,10 @@ from request_manager.callbacks import (
     IndependentFetchFn,
     RawExpectCallback,
     RawExpectFn,
+    ResponseType,
     ValidatedExpectCallback,
     ValidatedExpectFn,
 )
-from request_manager.exceptions import RequestManagerException
-from request_manager.logger import setup_logging
-from request_manager.types import ClientContext, ClientError, Response
 
 
 @dataclass(slots=True)
@@ -56,13 +55,13 @@ class RequestManager(ABC):
     ) -> Callable[[IndependentFetchFn], IndependentCallback]: ...
 
     @overload
-    def fetch[T: BaseModel | bytes = bytes](
+    def fetch[T: ResponseType = bytes](
         self,
         depends_on: FetchCallback[T],
         type_: type[T],
     ) -> Callable[[DependentFetchFn[T]], DependentCallback[T]]: ...
 
-    def fetch[T: BaseModel | bytes = bytes](
+    def fetch[T: ResponseType = bytes](
         self,
         depends_on: FetchCallback[T] | None = None,
         type_: type[T] | None = None,
@@ -82,27 +81,27 @@ class RequestManager(ABC):
         def _inner_dependent(fn: DependentFetchFn[T], /) -> DependentCallback[T]:
             callback = DependentCallback(fn, depends_on, type_)
             self.callbacks.fetching.append(
-                cast("DependentCallback[BaseModel | bytes]", callback)
+                cast("DependentCallback[ResponseType]", callback)
             )
             return callback
 
         return _inner_dependent
 
     @overload
-    def expect[T: BaseModel | bytes = bytes](
+    def expect[T: ResponseType = bytes](
         self,
         fetch: FetchCallback[T],
         type_: None = None,
     ) -> Callable[[RawExpectFn], RawExpectCallback]: ...
 
     @overload
-    def expect[T: BaseModel | bytes = bytes](
+    def expect[T: ResponseType = bytes](
         self,
         fetch: FetchCallback[T],
         type_: type[T],
     ) -> Callable[[ValidatedExpectFn[T]], ValidatedExpectCallback[T]]: ...
 
-    def expect[T: BaseModel | bytes = bytes](
+    def expect[T: ResponseType = bytes](
         self,
         fetch: FetchCallback[T],
         type_: type[T] | None = None,
@@ -115,7 +114,7 @@ class RequestManager(ABC):
             ) -> RawExpectCallback:
                 callback = RawExpectCallback(fn)
                 self.callbacks.expecting[
-                    cast("FetchCallback[BaseModel | bytes]", fetch)
+                    cast("FetchCallback[ResponseType]", fetch)
                 ].append(callback)
                 return callback
 
@@ -125,10 +124,10 @@ class RequestManager(ABC):
             fn: ValidatedExpectFn[T],
             /,
         ) -> ValidatedExpectCallback[T]:
-            callback = ValidatedExpectCallback[T](fn, type_)
-            self.callbacks.expecting[
-                cast("FetchCallback[BaseModel | bytes]", fetch)
-            ].append(cast("ExpectCallback[BaseModel | bytes]", callback))
+            callback = ValidatedExpectCallback(fn, type_)
+            self.callbacks.expecting[cast("FetchCallback[ResponseType]", fetch)].append(
+                cast("ExpectCallback[ResponseType]", callback)
+            )
             return callback
 
         return _inner_validated
@@ -194,104 +193,12 @@ class RequestManager(ABC):
         if self.runtime.client is None:
             raise RequestManagerException("There is no client configured")
 
-        responses: dict[FetchCallback, Response] = {}
-        futures: dict[
-            FetchCallback[BaseModel | bytes],
-            asyncio.Future[Response[BaseModel | bytes]],
-        ] = {
-            source: cast(
-                "asyncio.Future[Response[BaseModel | bytes]]",
-                asyncio.get_event_loop().create_future(),
-            )
-            for source in self.callbacks.fetching
-        }
-
         async with self.runtime.client as client:
-
-            async def _run[T: BaseModel | bytes](source: FetchCallback[T]) -> None:
-
-                match source:
-                    case IndependentCallback(fn=fn):
-                        request = fn()
-                    case DependentCallback(fn=fn, dependency=dep, type_=type_):
-                        if dep not in futures:
-                            raise RequestManagerException("Unresolved fetch dependency")
-
-                        if type_ is bytes:
-                            request = fn(await futures[dep])  # type: ignore
-                        else:
-                            request = fn(
-                                client.validate(await futures[dep], type_=type_)  # type: ignore
-                            )
-
-                if inspect.isawaitable(request):
-                    request = await request
-
-                print(
-                    f"[{source.fn.__name__}] Will retry for {request.options.retries} attempts or {request.options.timeout} seconds"
-                )
-
-                start = time.monotonic()
-                deadline = (
-                    time.monotonic() + request.options.timeout
-                    if request.options.timeout
-                    else None
-                )
-                attempt = 0
-
-                while True:
-                    attempt += 1
-                    is_exhausted_attempts = (
-                        request.options.retries != -1
-                        and attempt > request.options.retries + 1
-                    )
-                    is_exhausted_time = (
-                        deadline is not None and time.monotonic() >= deadline
-                    )
-                    elapsed = time.monotonic() - start
-
-                    try:
-                        response = await client.fetch(request)
-
-                        if (
-                            request.options.is_success is not None
-                            and not request.options.is_success(response)
-                        ):
-                            raise ClientError(
-                                f"Attempt {attempt} [{elapsed:07.3f}s]: Response not successful"
-                            )
-
-                        break
-                    except ClientError as e:
-                        print(e, file=sys.stderr)
-
-                        if is_exhausted_attempts or is_exhausted_time:
-                            raise ClientError(
-                                f"Response unsuccessful after {attempt} attempt(s) in {request.options.timeout} seconds"
-                            )
-
-                        backoff = request.options.retry_backoff * attempt
-                        if deadline is not None:
-                            backoff = min(backoff, deadline - time.monotonic())
-
-                        print(f"Retrying after {backoff:.1f} seconds ...")
-                        await asyncio.sleep(max(backoff, 0))
-
-                for expected in self.callbacks.expecting[
-                    cast("FetchCallback[BaseModel | bytes]", source)
-                ]:
-                    match expected:
-                        case ValidatedExpectCallback(fn=expect_fn, type_=type__):
-                            expect_fn(client.validate(response, type_=type__))  # type: ignore
-                        case RawExpectCallback(fn=expect_fn):
-                            expect_fn(response)
-
-                responses[source] = response  # type: ignore
-                futures[source].set_result(response)  # type: ignore
+            runner = DependantRunner(client=client, callbacks=self.callbacks)
 
             async with asyncio.TaskGroup() as tg:
                 for source in self.callbacks.fetching:
-                    tg.create_task(_run(source))
+                    tg.create_task(runner.run(source))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

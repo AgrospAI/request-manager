@@ -8,18 +8,18 @@ import httpx
 from pydantic import BaseModel, Field
 
 from request_manager.arguments import load_arguments
-from request_manager.types import BaseClient, ClientError, Request, Response
+from request_manager.types import Client, ClientError, Request, Response
 
 logging.getLogger("httpx").setLevel(logging.WARN)
 
 
 @dataclass(frozen=True, slots=True)
-class HttpxClient(BaseClient):
+class HttpxClient(Client):
     client: httpx.AsyncClient
     """Base client to use in queries"""
 
     @staticmethod
-    def default() -> AbstractAsyncContextManager[BaseClient]:
+    def default() -> AbstractAsyncContextManager[Client]:
         return build_httpx_client(load_arguments(HttpxClientConfig))
 
     async def __aenter__(self):
@@ -78,7 +78,7 @@ class HttpxClientConfig(BaseModel):
 
 def build_httpx_client(
     config: HttpxClientConfig,
-) -> AbstractAsyncContextManager[BaseClient]:
+) -> AbstractAsyncContextManager[Client]:
     headers = {"Content-Type": "application/json"}
 
     if config.api_key is not None:
