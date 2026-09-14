@@ -179,12 +179,15 @@ class RequestManager(ABC):
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            asyncio.run(self.arun())
+            pass
         else:
+            # If the try block does not raise
             raise RuntimeError(
                 "run() cannot be called from within a running event loop; "
                 "await arun() instead."
             )
+
+        asyncio.run(self.arun())
 
     async def arun(self) -> None:
         if self.runtime.client is None:

@@ -65,9 +65,9 @@ class Callbacks:
 @dataclass(frozen=True, slots=True)
 class RequestOptions:
     timeout: float = 0.0
-    retries: int = 0
+    retries: int = 1
     retry_backoff: float = 0.2
-    is_success: Callable[[Response[Any]], bool] | None = None
+    is_success: Callable[[Response[bytes]], bool] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +103,9 @@ class ClientError(Exception):
     def __init__(self, msg: str, *args: object) -> None:
         super().__init__(*args)
         self.msg = msg
+
+    def __str__(self):
+        return self.msg or "Empty message"
 
 
 class Client(Protocol):

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from request_manager.arguments import load_arguments
 from request_manager.types import Client, ClientError, Request, Response
 
-logging.getLogger("httpx").setLevel(logging.WARN)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @dataclass(frozen=True, slots=True)
