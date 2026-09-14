@@ -1,6 +1,7 @@
 # Request Manager library
 
 [![Coverage](https://raw.githubusercontent.com/AgrospAI/request-manager/refs/heads/main/coverage.svg)](https://github.com/agrospai/request-manager)
+[![PyPI](https://img.shields.io/pypi/v/request-manager?label=pypi&style=flat-square)](https://pypi.org/project/request-manager/)
 
 
 Typed Python library to help with request lifecycle.
