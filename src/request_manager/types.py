@@ -172,6 +172,3 @@ class Client(Protocol):
 class Runner(Protocol):
     async def run[T: ResponseType](self, source: FetchCallback[T]) -> None:
         """Execute given source"""
-
-
-type ClientContext = Client

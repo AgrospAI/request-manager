@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import asyncio
 from abc import ABC
 from collections.abc import Callable
@@ -9,13 +8,13 @@ from typing import cast, overload
 
 from pydantic import BaseModel
 
-from request_manager.arguments import load_arguments
+from request_manager.arguments import LazyArguments
 from request_manager.exceptions import RequestManagerException
 from request_manager.logger import setup_logging
 from request_manager.runners import DependantRunner
 from request_manager.types import (
     Callbacks,
-    ClientContext,
+    Client,
     DependentCallback,
     DependentFetchFn,
     ExpectCallback,
@@ -32,13 +31,12 @@ from request_manager.types import (
 
 @dataclass(slots=True)
 class Runtime:
-    client: ClientContext | None = None
+    client: Client | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RequestManager(ABC):
-    client: InitVar[ClientContext | None] = field(default=None)
-    parser: argparse.ArgumentParser = field(init=False)
+    client: InitVar[Client | None] = field(default=None)
 
     runtime: Runtime = field(default_factory=Runtime)
     callbacks: Callbacks = field(default_factory=Callbacks)
@@ -138,7 +136,7 @@ class RequestManager(ABC):
     @staticmethod
     def create[ArgsT: BaseModel](
         *,
-        client: ClientContext | None = None,
+        client: Client | None = None,
         arguments: type[ArgsT],
     ) -> _ArgsRequestManager[ArgsT]: ...
 
@@ -146,14 +144,14 @@ class RequestManager(ABC):
     @staticmethod
     def create(
         *,
-        client: ClientContext | None = None,
+        client: Client | None = None,
         arguments: None,
     ) -> _NoArgsRequestManager: ...
 
     @staticmethod
     def create[ArgsT: BaseModel](
         *,
-        client: ClientContext | None = None,
+        client: Client | None = None,
         arguments: type[ArgsT] | None = None,
     ) -> _NoArgsRequestManager | _ArgsRequestManager[ArgsT]:
         return (
@@ -161,17 +159,17 @@ class RequestManager(ABC):
             if arguments is None
             else _ArgsRequestManager(
                 client=client,
-                arguments=load_arguments(arguments),
+                lazy_arguments=LazyArguments(arguments),
             )
         )
 
-    def __post_init__(self, client: ClientContext | None) -> None:
+    def __post_init__(self, client: Client | None) -> None:
         setup_logging()
 
         if client is not None:
             self.set_client(client)
 
-    def set_client(self, client: ClientContext) -> ClientContext:
+    def set_client(self, client: Client) -> Client:
         self.runtime.client = client
         return client
 
@@ -203,7 +201,11 @@ class RequestManager(ABC):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class _ArgsRequestManager[ArgsT: BaseModel](RequestManager):
-    arguments: ArgsT
+    lazy_arguments: LazyArguments[ArgsT]
+
+    @property
+    def arguments(self) -> ArgsT:
+        return self.lazy_arguments.get()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

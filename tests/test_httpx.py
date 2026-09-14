@@ -1,9 +1,8 @@
 import pytest
 
-from request_manager.arguments import load_arguments
-from request_manager.httpx.client import HttpxClientConfig, build_httpx_client
+from request_manager.httpx.client import HttpxClient
 from request_manager.manager import RequestManager
-from request_manager.types import Request, Response
+from request_manager.types import Client, Request, Response
 
 
 @pytest.fixture(autouse=True)
@@ -12,9 +11,13 @@ def httpx_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RM__API_KEY", "test-key")
 
 
-async def test_httpx_client(manager: RequestManager) -> None:
-    config = load_arguments(HttpxClientConfig)
-    manager.set_client(build_httpx_client(config))
+@pytest.fixture
+def httpx_client() -> Client:
+    return HttpxClient.default()
+
+
+async def test_httpx_client(manager: RequestManager, httpx_client: Client) -> None:
+    manager.set_client(httpx_client)
 
     @manager.fetch()
     def request() -> Request:

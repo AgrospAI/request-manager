@@ -4,7 +4,7 @@ from typing import override
 import pytest
 from pydantic import BaseModel
 
-from request_manager.types import Client, ClientContext, ClientError, Request, Response
+from request_manager.types import Client, ClientError, Request, Response
 
 
 class MockData(BaseModel):
@@ -39,7 +39,7 @@ def body(request: pytest.FixtureRequest) -> str:
 def client(
     status_code: int,
     body: str,
-) -> ClientContext:
+) -> Client:
     return MockClient(status_code=status_code, body=body)
 
 
@@ -50,5 +50,5 @@ class RaisingClient(Client):
 
 
 @pytest.fixture
-def raising_client() -> ClientContext:
+def raising_client() -> Client:
     return RaisingClient()

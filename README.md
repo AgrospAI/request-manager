@@ -15,7 +15,7 @@ uv add request-manager
 
 You can also install the optional dependencies to make the different default client implementations work.
 
-As of now, there is only one default implementation.
+As of now, there is only one default client implementation using the httpx package. To use it, install `request-manager` with:
 
 ```bash
 uv add "request-manager[httpx]"
@@ -92,7 +92,25 @@ The default implementation, which we use via the `HttpxClient.default()` also us
 - Environment variables (prefixed with `RM__`)
 - `CLI` arguments
 
-If both are defined, the `CLI` arguments override the loaded environment variables.
+If both are defined, the `CLI` arguments override the loaded environment variables. If unsure, you can run the simple `todos` script shown earlier (or just a simple `manager.run()`) with the `--help` flag as in:
+
+```bash
+$ uv run ./scripts/test.py --help
+usage: request-manager [-h] [--base-url BASE_URL] [--authorization-header AUTHORIZATION_HEADER] [--authorization-scheme AUTHORIZATION_SCHEME] [--api-key API_KEY]
+                       [--timeout TIMEOUT]
+
+Test different API endpoints, capturing results and forwarding them
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   Base URL used for the requests(Env. RM__BASE_URL)
+  --authorization-header AUTHORIZATION_HEADER
+                        API authorization header to use(Env. RM__AUTHORIZATION_HEADER)
+  --authorization-scheme AUTHORIZATION_SCHEME
+                        API authorization scheme to use(Env. RM__AUTHORIZATION_SCHEME)
+  --api-key API_KEY     API key to use(Env. RM__API_KEY)
+  --timeout TIMEOUT     Maximum timeout for reponse arrival(Env. RM__TIMEOUT)
+```
 
 ## Advanced Usage
 
@@ -150,6 +168,30 @@ In this case, the `Arguments` will get instantiated and validated with values fr
 - Retry Backoff (`retry_backoff: float [default=0.2]`). Seconds to wait before retrying the defined request.
 - Is Success? (`is_sucess: Callable[[Response[bytes]], bool] | None [default=None]`). Custom function to check if a response is succesfull. By default, a response is successful if its HTTP status code does not correspond to an error code.
 
+Also, running the script with the `-h` or `--help` flag, will prompt the end-user with the following helping message:
+
+```bash
+$ uv run ./scripts/test.py -h
+usage: request-manager [-h] [--base-url BASE_URL] [--authorization-header AUTHORIZATION_HEADER] [--authorization-scheme AUTHORIZATION_SCHEME]
+                       [--api-key API_KEY] [--timeout TIMEOUT] [--poll-timeout POLL_TIMEOUT] [--poll-interval POLL_INTERVAL]
+
+Test different API endpoints, capturing results and forwarding them
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   Base URL used for the requests(Env. RM__BASE_URL)
+  --authorization-header AUTHORIZATION_HEADER
+                        API authorization header to use(Env. RM__AUTHORIZATION_HEADER)
+  --authorization-scheme AUTHORIZATION_SCHEME
+                        API authorization scheme to use(Env. RM__AUTHORIZATION_SCHEME)
+  --api-key API_KEY     API key to use(Env. RM__API_KEY)
+  --timeout TIMEOUT     Maximum timeout for reponse arrival(Env. RM__TIMEOUT)
+  --poll-timeout POLL_TIMEOUT
+                        Seconds before unsuccessful response timeout (default: 300)(Env. RM__POLL_TIMEOUT)
+  --poll-interval POLL_INTERVAL
+                        Seconds between polling attempts (default: 5)(Env. RM__POLL_INTERVAL)
+```
+
 ### Request dependency and response validation
 
 As we commented earlier, we load and validate values from environment variables and `CLI` arguments. Apart from that, we can also validate the given responses.
@@ -182,7 +224,12 @@ def fetch_todos() -> Request:
 def assert_result(response: Response[TodosResponse]) -> None:
     print(f"Received {len(response.results)} todos!")
     if response.next is None:
-        # This could be done by defining TodosResponse.next as a non-optional str
+        # This is an example, could also be done by defining TodosResponse as:
+        #
+        # class TodosResponse(BaseModel):
+        #     next: str # non-optional string
+        #     ...
+
         raise manager.error("Response did not contain a next page URL")
 
 @manager.expect(depends_on=fetch_todos, type_=TodosResponse)

@@ -2,6 +2,7 @@ import argparse
 import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dc_field
 from functools import partial
 from types import UnionType
 from typing import ClassVar, Union, get_args, get_origin
@@ -123,12 +124,26 @@ def _get_parser() -> argparse.ArgumentParser:
     return _parser
 
 
-def load_arguments[T: BaseModel](type_: type[T]) -> T:
-    parser = _get_parser()
+@dataclass(slots=True)
+class LazyArguments[T: BaseModel]:
+    """Register CLI arguments immediately, only parse on first access"""
 
+    type: type[T]
+    _value: T | None = dc_field(init=False, default=None)
+
+    def __post_init__(self) -> None:
+        register_arguments(self.type)
+
+    def get(self) -> T:
+        if self._value is None:
+            parser = _get_parser()
+            namespace, _ = parser.parse_known_args()
+            self._value = self.type.model_validate(vars(namespace))
+        return self._value
+
+
+def register_arguments(type_: type[BaseModel]) -> None:
+    parser = _get_parser()
     if type_ not in _registered:
         add_arguments_from_model(parser, type_)
         _registered.add(type_)
-
-    namespace, _ = parser.parse_known_args()
-    return type_.model_validate(vars(namespace))

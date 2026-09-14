@@ -3,7 +3,7 @@ import pytest
 from request_manager.exceptions import RequestManagerException
 from request_manager.manager import IndependentCallback, RequestManager
 from request_manager.types import (
-    ClientContext,
+    Client,
     ClientError,
     Request,
     RequestOptions,
@@ -75,7 +75,7 @@ def test_dependant_fetch_without_type_raises(manager: RequestManager) -> None:
 
 async def test_request_retry_attempts(
     manager: RequestManager,
-    raising_client: ClientContext,
+    raising_client: Client,
 ) -> None:
     manager.set_client(raising_client)
 
@@ -102,7 +102,7 @@ async def test_request_retry_attempts(
 
 async def test_request_retry_backoff(
     manager: RequestManager,
-    raising_client: ClientContext,
+    raising_client: Client,
 ) -> None:
     manager.set_client(raising_client)
 
