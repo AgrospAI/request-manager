@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
-from contextlib import AbstractAsyncContextManager
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Literal, Protocol, Self, cast, overload
 
@@ -172,4 +171,4 @@ class Runner(Protocol):
         """Execute given source"""
 
 
-type ClientContext = AbstractAsyncContextManager[Client]
+type ClientContext = Client
