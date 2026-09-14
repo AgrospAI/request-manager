@@ -32,23 +32,23 @@ type ExpectCallback[T: ResponseType = bytes] = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RawExpectCallback:
     fn: RawExpectFn
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidatedExpectCallback[T: ResponseType = bytes]:
     fn: ValidatedExpectFn[T]
     type_: type[T]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class IndependentCallback:
     fn: IndependentFetchFn
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependentCallback[T: ResponseType = bytes]:
     fn: DependentFetchFn[T]
     dependency: FetchCallback[T]
@@ -66,7 +66,7 @@ class Callbacks:
 @dataclass(frozen=True, slots=True)
 class RequestOptions:
     timeout: float = 0.0
-    retries: int = -1
+    retries: int = 0
     retry_backoff: float = 0.2
     is_success: Callable[[Response[Any]], bool] | None = None
 
@@ -81,7 +81,9 @@ class Request:
     options: RequestOptions = field(default_factory=RequestOptions)
 
     def is_successful(self, response: Response[bytes]) -> bool:
-        return self.options.is_success is not None and self.options.is_success(response)
+        if self.options.is_success is None:
+            return response.is_ok()
+        return self.options.is_success(response)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,18 +96,14 @@ class Response[T: ResponseType = bytes]:
 
     to_dict = asdict
 
-    @property
     def is_ok(self) -> bool:
         return 100 <= self.status_code < 400
 
 
-class ClientError(BaseException):
+class ClientError(Exception):
     def __init__(self, msg: str, *args: object) -> None:
         super().__init__(*args)
         self.msg = msg
-
-    def __str__(self) -> str:
-        return self.msg
 
 
 class Client(Protocol):
@@ -116,9 +114,6 @@ class Client(Protocol):
 
     async def __aexit__(self, *exc_info) -> None:
         return None
-
-    def __call__(self) -> Self:
-        return self
 
     @abstractmethod
     async def fetch(

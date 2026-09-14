@@ -1,17 +1,13 @@
-from __future__ import annotations
-
-from contextlib import AbstractAsyncContextManager
-
 import pytest
 
 from request_manager.manager import RequestManager
-from request_manager.types import Client, Request, Response
+from request_manager.types import Request, RequestOptions, Response
 from tests.mocks.client import MockData
 
 
 @pytest.mark.parametrize(
     "status_code",
-    [200, 400, 500],
+    [200],
 )
 @pytest.mark.parametrize(
     "body",
@@ -19,12 +15,9 @@ from tests.mocks.client import MockData
 )
 async def test_callback_setup(
     manager: RequestManager,
-    client: AbstractAsyncContextManager[Client],
     status_code: int,
     body: str,
 ) -> None:
-    manager.set_client(client)
-
     @manager.fetch()
     def request() -> Request:
         return Request(
@@ -56,3 +49,38 @@ async def test_callback_setup(
         )
 
     await manager.arun()
+
+
+def test_manager_run_from_sync_context(manager: RequestManager) -> None:
+    manager.run()
+
+
+async def test_async_request(manager: RequestManager) -> None:
+    @manager.fetch()
+    async def _() -> Request:
+        return Request(method="GET")
+
+    await manager.arun()
+
+
+@pytest.mark.parametrize(
+    "status_code",
+    [200, 400],
+)
+@pytest.mark.parametrize(
+    "body",
+    ['{"data": "mock_data"}', '{"data": "1234"}'],
+)
+async def test_request_is_success(manager: RequestManager, status_code, body) -> None:
+    @manager.fetch()
+    def _() -> Request:
+        return Request(
+            method="GET",
+            options=RequestOptions(is_success=lambda res: res.is_ok()),
+        )
+
+    if status_code == 200:
+        await manager.arun()
+    else:
+        with pytest.raises(ExceptionGroup):
+            await manager.arun()

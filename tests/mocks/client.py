@@ -4,7 +4,7 @@ from typing import override
 import pytest
 from pydantic import BaseModel
 
-from request_manager.types import Client, Request, Response
+from request_manager.types import Client, ClientContext, ClientError, Request, Response
 
 
 class MockData(BaseModel):
@@ -13,7 +13,7 @@ class MockData(BaseModel):
 
 @dataclass(slots=True)
 class MockClient(Client):
-    body: str
+    body: str = ""
     status_code: int = 200
 
     @override
@@ -31,14 +31,24 @@ def status_code(request: pytest.FixtureRequest) -> int:
 
 
 @pytest.fixture
-def body(request: pytest.FixtureRequest) -> MockData:
-    data = getattr(request, "param", "mock data")
-    return MockData(data=data)
+def body(request: pytest.FixtureRequest) -> str:
+    return getattr(request, "param", "mock data")
 
 
 @pytest.fixture
 def client(
     status_code: int,
     body: str,
-) -> MockClient:
+) -> ClientContext:
     return MockClient(status_code=status_code, body=body)
+
+
+class RaisingClient(Client):
+    @override
+    async def fetch(self, request):
+        raise ClientError("RaisingClient error")
+
+
+@pytest.fixture
+def raising_client() -> ClientContext:
+    return RaisingClient()

@@ -135,29 +135,26 @@ class RequestManager(ABC):
     # ---
 
     @overload
-    @classmethod
+    @staticmethod
     def create[ArgsT: BaseModel](
-        cls,
         *,
         client: ClientContext | None = None,
         arguments: type[ArgsT],
     ) -> _ArgsRequestManager[ArgsT]: ...
 
     @overload
-    @classmethod
+    @staticmethod
     def create(
-        cls,
         *,
         client: ClientContext | None = None,
         arguments: None,
     ) -> _NoArgsRequestManager: ...
 
-    @classmethod
+    @staticmethod
     def create[ArgsT: BaseModel](
-        cls,
         *,
         client: ClientContext | None = None,
-        arguments: type[ArgsT] | None,
+        arguments: type[ArgsT] | None = None,
     ) -> _NoArgsRequestManager | _ArgsRequestManager[ArgsT]:
         return (
             _NoArgsRequestManager(client=client)
@@ -180,14 +177,14 @@ class RequestManager(ABC):
 
     def run(self) -> None:
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
         except RuntimeError:
-            loop = None
-
-        if loop is not None:
-            loop.create_task(self.arun())
-        else:
             asyncio.run(self.arun())
+        else:
+            raise RuntimeError(
+                "run() cannot be called from within a running event loop; "
+                "await arun() instead."
+            )
 
     async def arun(self) -> None:
         if self.runtime.client is None:

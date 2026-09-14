@@ -1,7 +1,7 @@
 [project]
 name = "request-manager"
 version = "0.1.7"
-description = "Automating request creation and management"
+description = "HTTP Request lifecycle"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["pydantic>=2.13.4", "python-dotenv>=1.2.2"]
@@ -18,6 +18,12 @@ files = "src"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+omit = [
+    "src/request_manager/httpx/*",
+    "tests/*"
+]
 
 [build-system]
 requires = ["hatchling"]

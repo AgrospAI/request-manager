@@ -61,14 +61,6 @@ class DependantRunner:
 
         return request
 
-    async def send_request(self, request: Request) -> Response[bytes]:
-        response = await self.client.fetch(request)
-
-        if not request.is_successful(response):
-            raise ClientError("Unsuccessful response")
-
-        return response
-
     async def wait_backoff(
         self,
         time: TimeManager,
@@ -92,11 +84,16 @@ class DependantRunner:
         while True:
             attempt += 1
             is_exhausted_attempts = (
-                request.options.retries != -1 and attempt > request.options.retries + 1
+                request.options.retries != -1 and attempt > request.options.retries
             )
 
             try:
-                return await self.client.fetch(request)
+                response = await self.client.fetch(request)
+
+                if not request.is_successful(response):
+                    raise ClientError("Unsuccessful response")
+
+                return response
             except ClientError as e:
                 logger.debug("Attempt %d [%{:07.3f}fs]: %s", attempt, time.elapsed(), e)
 
@@ -112,22 +109,11 @@ class DependantRunner:
                     logger,
                 )
 
-    async def run[T: ResponseType](
+    def expect[T: ResponseType](
         self,
         source: FetchCallback[T],
+        response: Response[bytes],
     ) -> None:
-        request = await self.build_request(source)
-
-        run_logger = add_prefix(logger, f"[{source.fn.__name__}] ")
-
-        logger.info(
-            "Will retry for %d attempts or %d seconds",
-            request.options.retries,
-            request.options.timeout,
-        )
-
-        response = await self.fetch(request, run_logger)
-
         for expected in self.callbacks.expecting[
             cast("FetchCallback[BaseModel | bytes]", source)
         ]:
@@ -136,6 +122,24 @@ class DependantRunner:
                     expect_fn(self.client.validate(response, type_=type__))  # type: ignore
                 case RawExpectCallback(fn=expect_fn):
                     expect_fn(response)
+
+    async def run[T: ResponseType](
+        self,
+        source: FetchCallback[T],
+    ) -> None:
+        request = await self.build_request(source)
+
+        run_logger = add_prefix(logger, f"[{source.fn.__name__}] ")
+
+        run_logger.info(
+            "Will retry for %d attempts or %d seconds",
+            request.options.retries,
+            request.options.timeout,
+        )
+
+        response = await self.fetch(request, run_logger)
+
+        self.expect(source, response)
 
         self.responses[source] = response  # type: ignore
         self.futures[source].set_result(response)  # type: ignore
